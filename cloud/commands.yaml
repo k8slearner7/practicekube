@@ -1,0 +1,762 @@
+alias k=kubectl
+alias a="kubectl apply -f"
+
+
+echo minikube start --memory 4096 --vm-driver=kvm2
+minikube status
+minikube ssh
+minikube dashboard
+minikube version
+
+kubectl version
+kubectl api-resources |  less
+kubectl api-versions
+kubectl proxy --port=8001 &      --->2:32.30 (CKAD)
+curl http://localhost:8001/version
+curl http://localhost:8001/api/v1/namespaces/defaults/pods
+curl http://localhost:8001/api/v1/namespaces/defaults/pods
+curl http://localhost:8001/api/v1/namespaces/defaults/pods/
+curl http://localhost:8001/api/v1/namespaces/default/pods
+curl http://localhost:8001/api/v1/namespaces/default/pods/<pod-name>
+curl -XDELETE http://localhost:8001/api/v1/namespaces/default/pods/<pod-name>------> pod terminates
+
+kubectl get all --all-namespaces
+kubectl --help | less
+kubectl completion -h
+source <(kubectl completion bash)  --->tab tab
+alias k=kubectl
+alias a="kubectl apply -f"
+~/.vimrc       autocmd FileType yaml setlocal ai ts=2 sw=2 et
+kubectl create deployment -h | less
+kubectl run mynginx --image=nginx
+kubectl run --help | less
+kubectl get pods busybox -o yaml 
+kubectl edit pod <pod name>
+kubectl describe pod <pod name> ---Name, Namespace,node,Labels,annotations,IP,Containers, volumes, events
+Under Containers---> state: waiting  Reason: CrashLoopbackoff, Last state: terminated Reason: Completed
+
+kubectl create deployment -h
+kubectl create deployment my-failure --image=busybox --dry-run=clinet -o yaml >myfailure.yaml
+
+kubectl explain pods
+kubectl explain pods.metadata | less
+kubectl explain pods.spec | less
+kubectl explain pods.spec.containers | less
+kubectl explain pods.spec.containers.imagePullPolicy | less
+kubectl explain pods.spec --recursive
+kubectl explain pods.spec | grep -A 5 -B5 imagePul
+kubectl explain pods.spec --recursive | grep -A 5 -B5 imagePul
+kubectl explain pods.spec --recursive | less ---> search imagePul
+kubectl run busybox --image=busybox --restart=Never --command -- /bin/sh
+kubectl get pods busybox -o yaml >busy.yaml
+kubeadmin token create --print-join-command
+kubectl exec -it sidecar-pod -c side-car  /bin/bash
+ 
+kubectl config view
+
+
+kubectl run mynginx --image=nginx
+kubectl run --generator=run-pod/v1 mywebserver01 --image=nginx
+kubectl get pods
+kubectl label pod <podname>  env=dev
+kubectl label pod <podname>  env!=dev
+kubectl get pods --show-labels
+kubectl get pods -l env=dev
+
+k get rs
+
+kubectl proxy --port 8080
+127.0.0.1:8080
+
+
+ 
+curl -kubectl <k8s url>
+Static token file:--Authenticate with Bearer Token
+kubectl get secret
+kubectl describe secret <>---> token
+curl -kubectl <k8s url>/api/v1 --header "Authentication: Bearer <token>"
+curl -kubectl https://IP-HERE:/api/v1/ --header "Authorization: Bearer $TOKEN"
+
+
+
+
+
+
+##################Creating Kubernetes Pods
+apiVersion: We'll set it to v1.
+kind: This is the type of object we want to create. In our case, it will be Pod.
+metadata: This is where we'll give the pod a name (nginx) and say which namespace name we're going to use (web).
+spec: Here, we'll specify a container name and image (nginx for each).
+command: We're using a custom command (nginx), which will override the container's default settings.
+args: This will put some of those defaults we need (-g, daemon off) backubectl in, as well as a custom argument (-q) to specify we want to run in quiet mode.
+ports: We'll specify here what port we want for a container port. It's 80 in this case.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  namespace: web
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    command: ["nginx"]
+    args: ["-g", "daemon off;", "-q"]
+    ports:
+    - containerPort: 80
+    
+kubectl create -f /home/cloud_user/nginx.yml
+kubectl get pods -n web
+kubectl describe pod nginx -n web
+
+##################Configuring Kubernetes Pods
+Create a ConfigMap Called candy-service-config to Store the Container's Configuration Data: 
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: candy-service-config
+data:
+  candy.cfg: |-
+    candy.peppermint.power=100000000
+    candy.nougat-armor.strength=10
+
+kubectl apply -f candy-service-config.yml
+
+Create a Kubernetes Secret Called db-password to Store the Database Password:
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-password
+stringData:
+  password: Kub3rn3t3sRul3s!
+
+kubectl apply -f db-password-secret.yml
+Now that the secret is loaded into the cluster, delete the file:
+rm db-password-secret.yml
+Note: In a real-world scenario, you should delete this file after creating the object since it contains sensitive data!
+
+Create the Pod for the candy-service Application According to the Provided Specification:
+
+vim candy-service-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: candy-service
+spec:
+  securityContext:
+    fsGroup: 2000
+  serviceAccountName: candy-svc
+  containers:
+  - name: candy-service
+    image: linuxacademycontent/candy-service:1
+    volumeMounts:
+      - name: config-volume
+        mountPath: /etc/candy-service
+    env:
+    - name: DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: db-password
+          key: password
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+  volumes:
+  - name: config-volume
+    configMap:
+      name: candy-service-config
+
+kubectl apply -f candy-service-pod.yml
+Make sure your pod is up and running:
+kubectl get pod candy-service
+We should see it's ready and has a status of Running. (If it isn't, wait a minute or so and then run the command again.)
+
+
+
+
+##################Deploying a Pod to a Node with a Label in Kubernetes
+kubectl get nodes
+kubectl get pods --all-namespaces
+kubectl get namespaces
+kubectl get pods     ---> to get pods
+kubectl get pods --all-namespaces -o wide
+
+--------------------------------
+kubectl get no --show-labels
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+  nodeSelector:
+    disk: ssd
+    
+kubectl apply -f pod.yaml
+kubectl get po -o wide
+--------------------------------------------
+
+# ############################ Test:
+kubectl create deployment nginx --image=nginx
+kubectl get deployments
+kubectl get pods
+kubectl port-forward <pod_name> 8081:80
+curl --I http://127.0.0.1:8081
+
+kubectl exec -it <pod_name> -- nginx -v
+kubectl expose deployment nginx --port 80 --type NodePort
+kubectl get services
+kubectl get po -o wide
+curl -I YOUR_NODE:YOUR_PORT
+
+###########Performing a Rolling Update of an Application in Kubernetes
+Create and roll out version 1 of the application, and verify a successful deployment.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubeserve
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kubeserve
+  template:
+    metadata:
+      name: kubeserve
+      labels:
+        app: kubeserve
+    spec:
+      containers:
+      - image: linuxacademycontent/kubeserve:v1
+        name: app
+
+kubectl apply -f kubeserve-deployment.yaml --record
+kubectl rollout status deployments kubeserve
+Verify the app is at the correct version:
+kubectl describe deployment kubeserve
+Scale up the application to create high availability.
+Scale up your application to five replicas:
+kubectl scale deployment kubeserve --replicas=5
+Verify the additional replicas have been created:
+kubectl get pods
+Create a service, so users can access the application.
+Create a service for your deployment:
+kubectl expose deployment kubeserve --port 80 --target-port 80 --type NodePort
+Verify the service is present, and collect the cluster IP:
+kubectl get services
+Verify the service is responding:
+curl http://&lt;ip-address-of-the-service>
+Perform a rolling update to version 2 of the application, and verify its success.
+Start another terminal session to the same Kube Master server. There, use this curl loop command to see the version change as you perform the rolling update:
+
+while true; do curl http://&lt;ip-address-of-the-service>; done
+Perform the update in the original terminal session (while the curl loop is running in the new terminal session):
+
+kubectl set image deployments/kubeserve app=linuxacademycontent/kubeserve:v2 --v 6
+View the additional ReplicaSet created during the update:
+
+kubectl get replicasets
+Verify all pods are up and running:
+
+kubectl get pods
+View the rollout history:
+
+kubectl rollout history deployment kubeserve
+
+##################Monitor and Output Logs to a File in Kubernetes
+Identify the problematic pod in your cluster.
+Use the following command to view all the pods in your cluster:
+
+kubectl get pods --all-namespaces
+Collect the logs from the pod.
+Use the following command to collect the logs from the broken pod:
+
+kubectl logs &lt;pod_name> -n &lt;namespace_name>
+Output the logs to a file.
+Use the following command to output the logs to a file:
+
+kubectl logs &lt;pod_name> -n &lt;namespace_name> > broken-pod.log
+
+#################
+
+
+
+
+###########Creating a Service and Discovering DNS Names in Kubernetes
+
+
+kubectl run nginx --image=nginx
+kubectl get deployments
+kubectl expose deployment nginx --port 80 --type NodePort
+kubectl get services
+Create a pod that will allow you to query DNS, and verify it’s been created.
+Using an editor of your choice (e.g., Vim and the command vim busybox.yaml), enter the following YAML to create the busybox pod spec:
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox
+spec:
+  containers:
+  - image: busybox:1.28.4
+    command:
+      - sleep
+      - "3600"
+    name: busybox
+  restartPolicy: Always
+  
+
+kubectl create -f busybox.yaml
+kubectl get pods
+Use the following command to query the DNS name of the nginx service:
+kubectl exec busybox -- nslookup nginx
+Record the name of:
+&lt;service-name&gt.default.svc.cluster.local
+
+
+-----------------------------------------------
+ kubectl get deploy
+ kubectl run mynginx --image nginx
+ kubectl get deploy
+ kubectl expose  deployment mynginx --port 80 --type NodePort
+ kubectl get svc
+ Create Busybox Pod
+ kubectl get pods
+ kubectl exec busybox -- nslookup mynginx
+ kubectl get svc
+ kubectl exec busybox -- nslookup 10.100.61.115
+-----------------------------------------------
+
+
+# ############################Deploying a Simple Service to Kubernetes
+cat << EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-products
+  labels:
+    app: store-products
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: store-products
+  template:
+    metadata:
+      labels:
+        app: store-products
+    spec:
+      containers:
+      - name: store-products
+        image: linuxacademycontent/store-products:1.0.0
+        ports:
+        - containerPort: 80
+EOF
+
+Create a service for the store-products pods:
+
+cat << EOF | kubectl apply -f -
+kind: Service
+apiVersion: v1
+metadata:
+  name: store-products
+spec:
+  selector:
+    app: store-products
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+EOF
+
+kubectl get svc store-products
+kubectl exec busybox -- curl -s store-products
+
+
+# ############################ Deploying a Microservice Application to Kubernetes
+Deploy the Stan's Robot Shop app to the cluster
+cd ~/
+git clone https://github.com/linuxacademy/robot-shop.git
+kubectl create namespace robot-shop
+kubectl -n robot-shop create -f ~/robot-shop/K8s/descriptors/
+kubectl get pods -n robot-shop
+http://$kube_master_public_ip:30080
+kubectl edit deployment mongodb -n robot-shop
+Under spec:,  replicas: 1 and change it to replicas: 2.
+kubectl get deployment mongodb -n robot-shop
+
+ cd
+ git clone https://github.com/linuxacademy/robot-shop
+ cd robot-shop/
+ a K8s/descriptors/ -n robot-shop
+ kubectl get pods -n robot-shop
+ kubectl get pods -n robot-shop -w
+  kubectl get pods -n robot-shop
+ kubectl get deploy -n robot-shop
+ kubectl edit deployment mongodb -n robot-shop
+ kubectl get deploy -n robot-shop
+ kubectl get deploy mongodb -n robot-shop
+
+# ############################Scheduling Pods with Taints and Tolerations in Kubernetes
+Taint one of the worker nodes to repel work.
+List out the nodes:
+kubectl get nodes
+Taint the node, replacing <NODE_NAME> with one of the worker node names returned in the previous command:
+
+kubectl taint node <NODE_NAME> node-type=prod:NoSchedule
+
+ pod that will be scheduled to the dev environment:
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dev-pod
+  labels:
+    app: busybox
+spec:
+  containers:
+  - name: dev
+    image: busybox
+    command: ['sh', '-c', 'echo Hello Kubernetes! && sleep 3600']
+
+kubectl create -f dev-pod.yaml
+
+Schedule a pod to the prod environment.
+
+ specify a pod that will be scheduled to the prod environment:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prod
+  template:
+    metadata:
+      labels:
+        app: prod
+    spec:
+      containers:
+      - args:
+        - sleep
+        - "3600"
+        image: busybox
+        name: main
+      tolerations:
+      - key: node-type
+        operator: Equal
+        value: prod
+        effect: NoSchedule
+
+kubectl create -f prod-deployment.yaml
+
+Verify the pods have been scheduled:
+
+kubectl get pods -o wide
+Scale up the deployment:
+kubectl scale deployment/prod --replicas=3
+Lookubectl at our deployment again:
+kubectl get pods -o wide
+We should see that two more pods have been deployed.
+
+
+# ############################Forwarding Port Traffic with an Ambassador Container
+
+Create a ConfigMap Containing the Configuration for the HAProxy Ambassador
+Create a YAML definition file called fruit-service-ambassador-config.yml:
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fruit-service-ambassador-config
+data:
+  haproxy.cfg: |-
+    global
+        daemon
+        maxconn 256
+
+    defaults
+        mode http
+        timeout connect 5000ms
+        timeout client 50000ms
+        timeout server 50000ms
+
+    listen http-in
+        bind *:80
+        server server1 127.0.0.1:8775 maxconn 32
+        
+kubectl apply -f fruit-service-ambassador-config.yml
+
+Create a Multi-Container Pod Which Provides Access to the Legacy Service on Port 80 for the pod called fruit-service.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fruit-service
+spec:
+  containers:
+  - name: legacy-fruit-service
+    image: linuxacademycontent/legacy-fruit-service:1
+  - name: haproxy-ambassador
+    image: haproxy:1.7
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - name: config-volume
+      mountPath: /usr/local/etc/haproxy
+  volumes:
+  - name: config-volume
+    configMap:
+      name: fruit-service-ambassador-config
+Create the pod in the cluster:
+
+kubectl apply -f fruit-service.yml
+
+Testing
+
+We can create a busybox pod to use for testing by first creating a file called busybox.yml, with these contents:
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox
+spec:
+  containers:
+  - name: myapp-container
+    image: radial/busyboxplus:curl
+    command: ['sh', '-c', 'while true; do sleep 3600; done']
+
+kubectl apply -f busybox.yml
+
+We're going to use the busybox pod to test the legacy service on port 80. This command uses a subcommand to get the cluster's IP address for the pod, then executes a curl command in the busybox pod to access the legacy service on port 80:
+
+kubectl exec busybox -- curl $(kubectl get pod fruit-service -o=custom-columns=IP:.status.podIP --no-headers):80
+
+If everything is working, we should see some JSON listing various types of fruit.
+
+
+# ############################Creating Persistent Storage for Pods in Kubernetes
+Create a PersistentVolume:
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+
+kubectl apply -f redis-pv.yaml
+
+Create a PersistentVolumeClaim:
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redisdb-pvc
+spec:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+kubectl apply -f redis-pvc.yaml
+
+Create a pod from the redispod image, with a mounted volume to mount path /data: 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: redispod
+spec:
+  containers:
+  - image: redis
+    name: redisdb
+    volumeMounts:
+    - name: redis-data
+      mountPath: /data
+    ports:
+    - containerPort: 6379
+      protocol: TCP
+  volumes:
+  - name: redis-data
+    persistentVolumeClaim:
+      claimName: redisdb-pvc
+
+kubectl apply -f redispod.yaml
+kubectl get pods
+Connect to the container and write some data.
+Connect to the container and run the redis-cli:
+
+kubectl exec -it redispod redis-cli
+Set the key space server:name and value "redis server":
+
+SET server:name "redis server"
+Run the GET command to verify the value was set:
+
+GET server:name
+Exit the redis-cli:
+
+QUIT
+Delete redispod and create a new pod named redispod2.
+Delete the existing redispod:
+
+kubectl delete pod redispod
+Open the file redispod.yaml and change line 4 from name: redispod to:
+
+name: redispod2
+Create a new pod named redispod2:
+
+kubectl apply -f redispod.yaml
+Verify the volume has persistent data.
+Connect to the container and run redis-cli:
+
+kubectl exec -it redispod2 redis-cli
+Run the GET command to retrieve the data written previously:
+
+GET server:name
+Exit the redis-cli:
+
+# ############################
+
+
+
+
+
+
+
+# ############################Building a Kubernetes Cluster with Kubeadm
+Turn on iptables bridge calls on all three nodes:
+echo "net.bridge.bridge-nf-call-iptables=1" | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p    
+
+Install Docker on all 3 nodes
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+
+sudo add-apt-repository \
+   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+   $(lsb_release -cs) \
+   stable"
+   
+sudo apt-get update
+sudo apt-get install -y docker-ce=18.06.1~ce~3-0~ubuntu
+sudo apt-markubectl hold docker-ce
+sudo systemctl status docker
+
+Install Kubeadm, Kubelet, and Kubectl on all three nodes
+
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+cat << EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
+deb https://apt.kubernetes.io/ kubernetes-xenial main
+EOF
+
+sudo apt-get update
+sudo apt-get install -y kubelet=1.14.5-00 kubeadm=1.14.5-00 kubectl=1.14.5-00
+sudo apt-markubectl hold kubelet kubeadm kubectl
+
+On master:
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+kubectl version  ----> This command should return both a Client Version and a Server Version.
+sudo kubeadm join $some_ip:6443 --token $some_token --discovery-token-ca-cert-hash $some_hash
+
+verify:
+kubectl get nodes
+kubectl get nodes
+NAME            STATUS     ROLES    AGE   VERSION
+ip-10-0-1-101   NotReady   master   30s   v1.12.2
+ip-10-0-1-102   NotReady   &lt;none>   8s    v1.12.2
+ip-10-0-1-103   NotReady   &lt;none>   5s    v1.12.2
+Note that the nodes are expected to be in the NotReady state for now.
+
+On master: 
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/bc79dd1505b0c8681ece4de4c0d86c5cd2643275/Documentation/kube-flannel.yml
+
+kubectl get nodes
+NAME            STATUS   ROLES    AGE   VERSION
+ip-10-0-1-101   Ready    master   85s   v1.12.2
+ip-10-0-1-102   Ready    &lt;none>   63s   v1.12.2
+ip-10-0-1-103   Ready    &lt;none>   60s   v1.12.2
+
+
+# ############################ Upgrading the Kubernetes Cluster Using kubeadm
+Install Version 1.18.5 of kubeadm
+Install the Latest Version of kubelet on the Master Node
+Install the Latest Version of kubectl on the Master Node
+
+Install the Newer Version of kubelet on the Worker Nodes
+--->
+On master:
+Install Version 1.18.5 of kubeadm
+kubectl get nodes
+kubectl version --short
+sudo apt-markubectl unhold kubeadm kubelet
+sudo apt install -y kubeadm=1.18.5-00
+kubeadm version
+
+Plan the upgrade to checkubectl for errors:
+sudo kubeadm upgrade plan
+Apply the upgrade of the kube-scheduler and kube-controller-manager:
+sudo kubeadm upgrade apply v1.18.5
+Enter y at the prompt.
+Lookubectl at what version our nodes are at:
+[master ]$ kubectl get nodes
+
+Install the Latest Version of kubelet on the Master Node
+sudo apt-markubectl unhold kubelet
+sudo apt install -y kubelet=1.18.5-00
+Verify that the installation was successful:
+[master ]$ kubectl get nodes
+This should show that the master node is on v1.18.5, but the two worker nodes are still at v1.17.8. If we run kubectl version --short again, we'll see that the Server Version is v1.18.5, and the Client Version is at v1.17.8.
+
+Install the Latest Version of kubectl on the Master Node
+[master ]$ sudo apt-markubectl unhold kubectl
+Install the latest version of kubectl:
+[master ]$ sudo apt install -y kubectl=1.18.5-00
+Verify that the installation was successful:
+[master ]$ kubectl version --short
+
+
+--->
+Install the Newer Version of kubelet on the Worker Nodes
+On Worker 1
+[worker1 ]$ sudo apt-markubectl unhold kubelet
+Install the latest version of kubelet:
+[worker1 ]$ sudo apt install -y kubelet=1.18.5-00
+On Worker 0
+[worker0 ]$ sudo apt-markubectl unhold kubelet
+Install the latest version of kubelet:
+[worker0 ]$ sudo apt install -y kubelet=1.18.5-00
+Conclusion
+You've now successfully updated this Kubernetes cluster. Congratulations on completing this lab!
+
+
+
+
+
+
+
+

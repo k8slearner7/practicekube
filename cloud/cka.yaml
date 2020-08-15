@@ -1,0 +1,485 @@
+##################Creating Kubernetes Pods
+apiVersion: We'll set it to v1.
+kind: This is the type of object we want to create. In our case, it will be Pod.
+metadata: This is where we'll give the pod a name (nginx) and say which namespace name we're going to use (web).
+spec: Here, we'll specify a container name and image (nginx for each).
+command: We're using a custom command (nginx), which will override the container's default settings.
+args: This will put some of those defaults we need (-g, daemon off) back in, as well as a custom argument (-q) to specify we want to run in quiet mode.
+ports: We'll specify here what port we want for a container port. It's 80 in this case.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  namespace: web
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    command: ["nginx"]
+    args: ["-g", "daemon off;", "-q"]
+    ports:
+    - containerPort: 80
+    
+kubectl create -f /home/cloud_user/nginx.yml
+kubectl get pods -n web
+kubectl describe pod nginx -n web
+
+##################Configuring Kubernetes Pods
+Create a ConfigMap Called candy-service-config to Store the Container's Configuration Data: 
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: candy-service-config
+data:
+  candy.cfg: |-
+    candy.peppermint.power=100000000
+    candy.nougat-armor.strength=10
+
+kubectl apply -f candy-service-config.yml
+
+Create a Kubernetes Secret Called db-password to Store the Database Password:
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-password
+stringData:
+  password: Kub3rn3t3sRul3s!
+
+kubectl apply -f db-password-secret.yml
+Now that the secret is loaded into the cluster, delete the file:
+rm db-password-secret.yml
+Note: In a real-world scenario, you should delete this file after creating the object since it contains sensitive data!
+
+Create the Pod for the candy-service Application According to the Provided Specification:
+vim candy-service-pod.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: candy-service
+spec:
+  securityContext:
+    fsGroup: 2000
+  serviceAccountName: candy-svc
+  containers:
+  - name: candy-service
+    image: linuxacademycontent/candy-service:1
+    volumeMounts:
+      - name: config-volume
+        mountPath: /etc/candy-service
+    env:
+    - name: DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: db-password
+          key: password
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+  volumes:
+  - name: config-volume
+    configMap:
+      name: candy-service-config
+
+kubectl apply -f candy-service-pod.yml
+Make sure your pod is up and running:
+kubectl get pod candy-service
+We should see it's ready and has a status of Running. (If it isn't, wait a minute or so and then run the command again.)
+
+
+##################Deploying a Pod to a Node with a Label in Kubernetes
+ list the nodes in your cluster:
+kubectl get nodes
+We should see three nodes: one master and two workers.
+
+list the pods in all namespaces:
+kubectl get pods --all-namespaces
+list all the namespaces in the cluster:
+kubectl get namespaces
+Here, we should see four namespaces: default, kube-public, kube-system, and kube-node-lease.
+kubectl get pods---> to get pods
+To find the IP address of the API server:
+kubectl get pods --all-namespaces -o wide
+to list the labels for all nodes:
+kubectl get no --show-labels
+
+We should see the label disk=ssd for one of the nodes.
+
+Create a file named pod.yaml (vi pod.yaml) and paste in the following:
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+  nodeSelector:
+    disk: ssd
+
+kubectl apply -f pod.yaml
+
+kubectl get po -o wide
+You should see the node with the label in the node column
+
+###########Creating a Service and Discovering DNS Names in Kubernetes
+Creating a Service and Discovering DNS Names in Kubernetes
+We have been given a three-node cluster. Within that cluster, we must perform the following tasks in order to create a service and resolve the DNS names for that service. We will create the necessary Kubernetes resources in order to perform this DNS query.
+
+To adequately complete this hands-on lab, we must have a working deployment, a working service, and be able to record the DNS name of the service within our Kubernetes cluster.
+
+Log in to the Kube Master server using the credentials on the lab page (either in your local terminal, using the Instant Terminal feature, or using the public IP), and work through the objectives listed.
+
+Create an nginx deployment, and verify it was successful.
+Use this command to create an nginx deployment:
+
+kubectl run nginx --image=nginx
+Use this command to verify deployment was successful:
+
+kubectl get deployments
+Create a service, and verify the service was successful.
+Use this command to create a service:
+kubectl expose deployment nginx --port 80 --type NodePort
+Use this command to verify the service was created:
+kubectl get services
+Create a pod that will allow you to query DNS, and verify it’s been created.
+Using an editor of your choice (e.g., Vim and the command vim busybox.yaml), enter the following YAML to create the busybox pod spec:
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox
+spec:
+  containers:
+  - image: busybox:1.28.4
+    command:
+      - sleep
+      - "3600"
+    name: busybox
+  restartPolicy: Always
+Use the following command to create the busybox pod:
+
+kubectl create -f busybox.yaml
+Use the following command to verify the pod was created successfully:
+
+kubectl get pods
+Perform a DNS query to the service.
+Use the following command to query the DNS name of the nginx service:
+
+kubectl exec busybox -- nslookup nginx
+Record the DNS name.
+Record the name of:
+
+&lt;service-name&gt.default.svc.cluster.local
+
+
+
+
+
+# ############################Deploying a Simple Service to Kubernetes
+
+cat << EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-products
+  labels:
+    app: store-products
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: store-products
+  template:
+    metadata:
+      labels:
+        app: store-products
+    spec:
+      containers:
+      - name: store-products
+        image: linuxacademycontent/store-products:1.0.0
+        ports:
+        - containerPort: 80
+EOF
+
+Create a service for the store-products pods:
+
+cat << EOF | kubectl apply -f -
+kind: Service
+apiVersion: v1
+metadata:
+  name: store-products
+spec:
+  selector:
+    app: store-products
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+EOF
+
+kubectl get svc store-products
+NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+store-products   ClusterIP   10.104.11.230   <none>        80/TCP    59s
+
+Use kubectl exec to query the store-products service from the busybox testing pod.
+
+kubectl exec busybox -- curl -s store-products
+
+
+# ############################ Deploying a Microservice Application to Kubernetes
+Deploy the Stan's Robot Shop app to the cluster
+Clone the Git repo that contains the pre-made descriptors:
+
+cd ~/
+git clone https://github.com/linuxacademy/robot-shop.git
+
+Since this application has many components, it is a good idea to create a separate namespace for the app:
+kubectl create namespace robot-shop
+
+Deploy the app to the cluster:
+kubectl -n robot-shop create -f ~/robot-shop/K8s/descriptors/
+
+Check the status of the application's pods:
+kubectl get pods -n robot-shop
+
+You should be able to reach the robot shop app from your browser using the Kube master node's public IP:
+http://$kube_master_public_ip:30080
+
+Scale up the MongoDB deployment to two replicas instead of just one
+Edit the deployment descriptor:
+kubectl edit deployment mongodb -n robot-shop
+
+You should see some YAML describing the deployment object.
+Under spec:, look for the line that says replicas: 1 and change it to replicas: 2.
+Save and exit.
+Check the status of the deployment with:
+kubectl get deployment mongodb -n robot-shop
+
+After a few moments, the number of available replicas should be 2.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ############################Building a Kubernetes Cluster with Kubeadm
+ 
+Install Docker on all three nodes:
+Add the Docker GPG key:
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+Add the Docker repository:
+
+sudo add-apt-repository \
+   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+   $(lsb_release -cs) \
+   stable"
+Update packages:
+sudo apt-get update
+Install Docker:
+sudo apt-get install -y docker-ce=18.06.1~ce~3-0~ubuntu
+Hold Docker at this specific version:
+sudo apt-mark hold docker-ce
+Verify that Docker is up and running with:
+sudo systemctl status docker
+Make sure the Docker service status is active (running)!
+
+Install Kubeadm, Kubelet, and Kubectl on all three nodes
+
+Add the Kubernetes GPG key:
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+
+Add the Kubernetes repository:
+cat << EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
+deb https://apt.kubernetes.io/ kubernetes-xenial main
+EOF
+
+Update packages:
+sudo apt-get update
+Install kubelet, kubeadm, and kubectl:
+sudo apt-get install -y kubelet=1.14.5-00 kubeadm=1.14.5-00 kubectl=1.14.5-00
+Hold the Kubernetes components at this specific version:
+sudo apt-mark hold kubelet kubeadm kubectl
+
+
+Bootstrap Kube master node, do this:
+
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+
+ set up the local kubeconfig:
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+Take note that the kubeadm init command printed a long kubeadm join command to the screen. You will need that kubeadm join command in the next step!
+
+Run the following command on the Kube master node to verify it is up and running:
+
+kubectl version
+This command should return both a Client Version and a Server Version.
+
+Join the two Kube worker nodes to the cluster
+
+sudo kubeadm join $some_ip:6443 --token $some_token --discovery-token-ca-cert-hash $some_hash
+
+kubectl get nodes
+NAME            STATUS     ROLES    AGE   VERSION
+ip-10-0-1-101   NotReady   master   30s   v1.12.2
+ip-10-0-1-102   NotReady   &lt;none>   8s    v1.12.2
+ip-10-0-1-103   NotReady   &lt;none>   5s    v1.12.2
+Note that the nodes are expected to be in the NotReady state for now.
+
+Set up cluster networking with flannel
+Turn on iptables bridge calls on all three nodes:
+
+echo "net.bridge.bridge-nf-call-iptables=1" | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+Next, run this only on the Kube master node:
+
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/bc79dd1505b0c8681ece4de4c0d86c5cd2643275/Documentation/kube-flannel.yml
+Now flannel is installed! Make sure it is working by checking the node status again:
+
+kubectl get nodes
+After a short time, all three nodes should be in the Ready state. If they are not all Ready the first time you run kubectl get nodes, wait a few moments and try again. It should look something like this:
+
+NAME            STATUS   ROLES    AGE   VERSION
+ip-10-0-1-101   Ready    master   85s   v1.12.2
+ip-10-0-1-102   Ready    &lt;none>   63s   v1.12.2
+ip-10-0-1-103   Ready    &lt;none>   60s   v1.12.2
+
+
+TEST: 
+run a deployment of ngnix:
+kubectl create deployment nginx --image=nginx
+kubectl get deployments
+kubectl get pods
+
+Use port forwarding to extend port 80 to 8081, and verify access to the pod directly.
+kubectl port-forward <pod_name> 8081:80
+Open a new terminal session and log in to the Controller server. Then, run this command to verify we can access this container directly:
+curl --I http://127.0.0.1:8081
+
+Still in Controller, execute the nginx version command from a pod (using the same <pod_name> as before):
+kubectl exec -it <pod_name> -- nginx -v
+
+Create a service, and verify connectivity on the node port.
+kubectl expose deployment nginx --port 80 --type NodePort
+kubectl get services
+kubectl get po -o wide
+curl -I YOUR_NODE:YOUR_PORT
+
+# ############################ Upgrading the Kubernetes Cluster Using kubeadm
+
+Install Version 1.18.5 of kubeadm
+On the master node, check the current version of kubeadm, then check for the Client Version and Server Version:
+[master ]$ kubectl get nodes
+[master ]$ kubectl version --short
+Take the hold off of kubeadm and kubelet:
+[master ]$ sudo apt-mark unhold kubeadm kubelet
+
+Install them using the package manager:
+[master ]$ sudo apt install -y kubeadm=1.18.5-00
+Check the version again (which should show v1.18.5):
+[master ]$ kubeadm version
+
+Plan the upgrade to check for errors:
+[master ]$ sudo kubeadm upgrade plan
+Apply the upgrade of the kube-scheduler and kube-controller-manager:
+[master ]$ sudo kubeadm upgrade apply v1.18.5
+Enter y at the prompt.
+
+Look at what version our nodes are at:
+
+[master ]$ kubectl get nodes
+Install the Latest Version of kubelet on the Master Node
+Make sure the kubelet package isn't on hold:
+
+[master ]$ sudo apt-mark unhold kubelet
+Install the latest version of kubelet:
+
+[master ]$ sudo apt install -y kubelet=1.18.5-00
+Verify that the installation was successful:
+
+[master ]$ kubectl get nodes
+This should show that the master node is on v1.18.5, but the two worker nodes are still at v1.17.8. If we run kubectl version --short again, we'll see that the Server Version is v1.18.5, and the Client Version is at v1.17.8.
+
+Install the Latest Version of kubectl on the Master Node
+Make sure the kubectl package isn't on hold:
+
+[master ]$ sudo apt-mark unhold kubectl
+Install the latest version of kubectl:
+
+[master ]$ sudo apt install -y kubectl=1.18.5-00
+Verify that the installation was successful:
+
+[master ]$ kubectl version --short
+Install the Newer Version of kubelet on the Worker Nodes
+On Worker 1
+Make sure the kubelet package isn't on hold:
+
+[worker1 ]$ sudo apt-mark unhold kubelet
+Install the latest version of kubelet:
+
+[worker1 ]$ sudo apt install -y kubelet=1.18.5-00
+On Worker 0
+Make sure the kubelet package isn't on hold:
+
+[worker0 ]$ sudo apt-mark unhold kubelet
+Install the latest version of kubelet:
+
+[worker0 ]$ sudo apt install -y kubelet=1.18.5-00
+Conclusion
+You've now successfully updated this Kubernetes cluster. Congratulations on completing this lab!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

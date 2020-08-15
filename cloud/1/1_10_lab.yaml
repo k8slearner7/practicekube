@@ -1,0 +1,279 @@
+alias k=kubectl
+alias a="kubectl apply -f"
+alias kg="kubectl get"
+alias kd="kubectl describe"
+
+#############    1_Deploying a Pod to a Node with a Label in Kubernetes
+kubectl get nodes
+kubectl get nodes --show-labels
+kubectl label node ip-172-31-73-4 disk=ssd
+kubectl get nodes --show-labels
+k get pods
+k get pods  -o wide
+kubectl explain pod
+kubectl explain pod.spec
+kubectl explain pod.spec | grep -C 10 -i nodes
+kubectl explain pod.spec.nodeSelector
+
+apiVersion: v1
+kind: Pod
+metadata:
+    name: nginx
+spec:
+ containers:
+    - name: nginx
+      image: nginx
+ nodeSelector: 
+    disk: ssd
+
+
+##########      Deploying a Simple Service to Kubernetes
+
+k get pods --show-labels | grep store
+k get pods -l  app=store-products
+
+ k exec -it redis-master-6b54579d85-vthqg bash
+kubectl exec busybox -- curl -s store-products
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: store-products
+ labels:
+  app: store-products
+spec:
+ replicas: 4
+ selector:
+   matchLabels: 
+    app: store-products
+ template:
+  metadata:
+    labels:
+        app: store-products
+  spec:
+   containers:
+   - name: store-products
+     image: linuxacademycontent/store-products:1.0.0
+     ports:
+     - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-products
+spec:
+  selector:
+    app: store-products
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort:80
+
+
+
+#####################Deploying a Microservice Application to Kubernetes
+
+ git clone https://github.com/linuxacademy/robot-shop.git
+ kubectl create namespace robot-shop
+ kubectl -n robot-shop create -f ~/robot-shop/K8s/descriptors/
+ a descriptors/.  -n robot-shop
+ 
+ kubectl get pods -n robot-shop
+ kubectl get svc  -n robot-shop
+ k describe svc web -n robot-shop
+
+ 
+ kubectl get deploy -n robot-shop
+ k edit deployment mongodb -n robot-shop
+ kubectl get deploy -n robot-shop
+ kubectl get deploy mongodb  -n robot-shop
+ 
+
+##################### Creating a Service and Discovering DNS Names in Kubernetes -
+ k run mynginx --image=nginx
+k get deploy
+k expose deployment mynginx  --port 90 --type NodePort
+k get svc
+vim busybox.yaml
+a busybox.yaml
+k get pods
+k exec -it  busybox1 -- nslookup mynginx
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox
+spec:
+  containers:
+  - image: busybox:1.28.4
+    command:
+      - sleep
+      - "3600"
+    name: busybox
+  restartPolicy: Always
+  
+###############Upgrade k8s
+current 1.14 to 1.18 (not possible)  1 version at a time
+apt-get install -y kubeadm=1.15.0-00  --allow-downgrades    ---> to downgrade 
+    
+kubectl get nodes
+kubectl version --short
+sudo apt-mark unhold kubeadm
+apt install -y kubeadm=1.18.5-00
+kubeadm upgrade plan
+kubeadm upgrade apply v1.18.5
+kubectl get nodes
+kubectl version --short
+sudo apt-mark unhold kubelet kubectl
+sudo apt install -y kubelet=1.18.5-00 kubectl=1.18.5-00
+kubectl version --short
+
+sudo apt-mark unhold kubelet
+apt install -y kubelet=1.18.5-00
+k version --short
+
+Other
+apt-get install -y kubeadm=1.15.12-00  --allow-downgrades
+kubeadm upgrade plan
+sudo apt-mark unhold kubelet
+apt install -y kubelet=1.15.12-00 kubectl=1.15.12-00
+
+###############8_Creating Kubernetes Pods
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  namespace: web
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    command: ["nginx"]
+    args: ["-g", "daemon off;", "-q"]
+    ports:
+    - containerPort: 80
+    
+k create ns web
+ a 11.yaml
+k get pods -n web
+k describe pod nginx -n web
+
+
+###########Configuring Pods
+ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: candy-service-config
+data:
+  candy.cfg: |-
+    candy.peppermint.power=100000000
+    candy.nougat-armor.strength=10
+    
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-password
+stringData:
+  password: Kub3rn3t3sRul3s!
+  
+apiVersion: v1
+kind: Pod
+metadata:
+  name: candy-service
+spec:
+  securityContext:
+    fsGroup: 2000
+  serviceAccountName: candy-svc
+  containers:
+  - name: candy-service
+    image: linuxacademycontent/candy-service:1
+    volumeMounts:
+      - name: config-volume
+        mountPath: /etc/candy-service
+    env:
+    - name: DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: db-password
+          key: password
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+  volumes:
+  - name: config-volume
+    configMap:
+      name: candy-service-config
+
+k get secret
+k get secret db-password -o yaml
+echo $DB_PASSWORD
+id
+cat /etc/candy-service/candy.cfg
+
+#######################1010_Scheduling Pods with Taints and Tolerations in Kubernetes
+2 env: dev/prod..Prevent any pod from accidentally scheuled on prod env.
+Using Taint to specify Prod Env.  
+
+kubectl taint nodes node1      key=value:NoSchedule
+kubectl taint node <NODE_NAME> node-type=prod:NoSchedule
+k describe node ip-172-31-79-177 | grep -iC5 taint
+Schedule Pod for dev env:
+apiVersion: v1
+kind: Pod
+metadata:
+ name: dev-pod
+ labels:
+  app: busybox
+spec:
+ containers:
+ - name: dev
+   image: busybox
+   command: ["/bin/sh"]
+   args: ["-c", "while true; do echo hello kubernetes ; sleep 3600;done"]
+
+For Prod:
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prod
+  template:
+    metadata:
+      labels:
+        app: prod
+    spec:
+      containers:
+      - args:
+        - sleep
+        - "3600"
+        image: busybox
+        name: main
+      tolerations:
+      - key: node-type
+        operator: Equal
+        value: prod
+        effect: NoSchedule
+
+kubectl get pods -o wide
+kubectl scale deployment/prod --replicas=3
+kubectl get pods -o wide
+
+
+   
+
+
+
+
+
+
+

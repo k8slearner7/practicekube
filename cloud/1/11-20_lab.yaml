@@ -1,0 +1,80 @@
+git clone  https://github.com/schoolofdevops/kube-ops-view
+kubectl apply -f kube-ops-view/deploy/
+
+###################Creating Persistent Storage for Pods in Kubernetes 
+Create PV, PVC,Pod with volume Mounted to it..
+write data,Delete Pod,recreate pod with same yaml  and verify data still resides on volume
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-pv
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+
+    k get pv  ---> available
+    
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redisdb-pvc
+spec:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+      
+      k get pvc      ---> Bounded?
+      
+apiVersion: v1
+kind: Pod
+metadata:
+ name: redis-pod
+spec:
+ containers:
+ - name: redis-
+   image: redis
+   volumeMounts:
+   - name: redis-data
+     mountPath: /data
+   ports:
+   - containerPort:6379
+     protocol: TCP
+ volumes:
+ - name: redis-data
+   persistentVolumeClaim: 
+   claimName: redisdb-pvc
+     
+ root@ip-172-31-76-134:~# k exec -it redis-pod redis-cli
+127.0.0.1:6379> SET server:name "redis server"
+OK
+127.0.0.1:6379> SET servername red1
+OK
+127.0.0.1:6379> GET servername
+"red1"
+127.0.0.1:6379> GET server:name
+"redis server"
+127.0.0.1:6379> quit
+    
+k delete pod redis-pod
+pod "redis-pod" deleted
+
+change name of pod---> metadata
+Create pod  
+a pod.yaml
+127.0.0.1:6379> GET servername
+"red1"
+127.0.0.1:6379> GET server:name
+"redis server"
+
+
+###########################12_Performing a Rolling Update of an Application in Kubernetes
